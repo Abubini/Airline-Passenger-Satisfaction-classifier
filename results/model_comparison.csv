@@ -1,0 +1,6 @@
+,Logistic Regression,Decision Tree
+Accuracy,0.8693,0.9466
+Precision,0.8438,0.9424
+Recall,0.8581,0.9342
+F1 Score,0.8509,0.9383
+ROC-AUC,0.9277,0.9875

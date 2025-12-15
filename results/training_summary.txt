@@ -1,0 +1,74 @@
+MODEL TRAINING SUMMARY
+======================
+
+Dataset Information:
+-------------------
+- Scaled data used for: Logistic Regression, Newton's Method, SVM
+- Non-scaled data used for: Decision Tree, Random Forest
+- Test size: 20%
+- Random state: 42
+
+Models Trained:
+--------------
+1. Logistic Regression (LBFGS solver)
+2. Decision Tree
+3. Logistic Regression with Newton's Method
+4. Random Forest
+5. Support Vector Machine (SVM)
+
+Model Performances:
+------------------
+
+Logistic Regression:
+- Accuracy:  0.8693
+- Precision: 0.8438
+- Recall:    0.8581
+- F1 Score:  0.8509
+- ROC-AUC:   0.9277
+- Training Time: 1.17s
+
+Decision Tree:
+- Accuracy:  0.9466
+- Precision: 0.9424
+- Recall:    0.9342
+- F1 Score:  0.9383
+- ROC-AUC:   0.9875
+- Training Time: 0.54s
+
+Newton's Method:
+- Accuracy:  0.8694
+- Precision: 0.8439
+- Recall:    0.8581
+- F1 Score:  0.8509
+- ROC-AUC:   0.9277
+- Training Time: 0.55s
+
+Random Forest:
+- Accuracy:  0.9559
+- Precision: 0.9544
+- Recall:    0.9437
+- F1 Score:  0.9490
+- ROC-AUC:   0.9925
+- Training Time: 3.41s
+
+SVM:
+- Accuracy:  0.9522
+- Precision: 0.9491
+- Recall:    0.9403
+- F1 Score:  0.9447
+- ROC-AUC:   0.9882
+- Training Time: 1968.92s
+
+
+Best Model: Random Forest
+
+Files Generated:
+---------------
+1. models/logistic_regression_model.pkl
+2. models/decision_tree_model.pkl
+3. models/newton_method_model.pkl
+4. models/random_forest_model.pkl
+5. models/svm_model.pkl
+6. results/model_comparison_summary.csv
+7. results/detailed_model_comparison.csv
+8. results/training_summary.txt
