@@ -8,6 +8,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix, classification_report
 import time
 
@@ -114,7 +116,11 @@ def evaluate_model(model, X_test, y_test, model_name="", training_time=None):
     prediction_time = time.time() - start_time
     print(f"Prediction time: {prediction_time:.4f} seconds")
     
-    y_pred_proba = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else None
+    # Get probabilities if available (for ROC-AUC)
+    try:
+        y_pred_proba = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else None
+    except:
+        y_pred_proba = None
     
     # Calculate metrics
     accuracy = accuracy_score(y_test, y_pred)
@@ -129,10 +135,15 @@ def evaluate_model(model, X_test, y_test, model_name="", training_time=None):
     
     # Calculate ROC-AUC if possible
     if y_pred_proba is not None:
-        roc_auc = roc_auc_score(y_test, y_pred_proba)
-        print(f"ROC-AUC:   {roc_auc:.4f}")
+        try:
+            roc_auc = roc_auc_score(y_test, y_pred_proba)
+            print(f"ROC-AUC:   {roc_auc:.4f}")
+        except:
+            roc_auc = None
+            print(f"ROC-AUC:   N/A (calculation failed)")
     else:
         roc_auc = None
+        print(f"ROC-AUC:   N/A (probabilities not available)")
     
     # Print confusion matrix
     cm = confusion_matrix(y_test, y_pred)
@@ -337,13 +348,83 @@ def train_svm(scaled_df):
     
     return svm_model, metrics
 
+def train_knn(scaled_df):
+    """
+    Train K-Nearest Neighbors model on scaled data
+    """
+    print(f"\n{'='*50}")
+    print("Training K-Nearest Neighbors (KNN) Model")
+    print(f"{'='*50}")
+    
+    # Prepare data
+    X_train, X_test, y_train, y_test = prepare_data(scaled_df, "scaled")
+    
+    # Create and train model
+    print("\nTraining KNN...")
+    start_time = time.time()
+    knn_model = KNeighborsClassifier(
+        n_neighbors=5,
+        weights='distance',  # Weight points by inverse of distance
+        algorithm='auto',
+        leaf_size=30,
+        p=2,  # Euclidean distance
+        metric='minkowski',
+        n_jobs=-1  # Use all available cores
+    )
+    
+    knn_model.fit(X_train, y_train)
+    training_time = time.time() - start_time
+    
+    # Evaluate
+    metrics = evaluate_model(knn_model, X_test, y_test, "K-Nearest Neighbors", training_time)
+    
+    # Save model
+    os.makedirs("models", exist_ok=True)
+    model_path = "models/knn_model.pkl"
+    joblib.dump(knn_model, model_path)
+    print(f"\n✓ KNN model saved to: {model_path}")
+    
+    return knn_model, metrics
+
+def train_gaussian_naive_bayes(scaled_df):
+    """
+    Train Gaussian Naive Bayes model on scaled data
+    """
+    print(f"\n{'='*50}")
+    print("Training Gaussian Naive Bayes Model")
+    print(f"{'='*50}")
+    
+    # Prepare data
+    X_train, X_test, y_train, y_test = prepare_data(scaled_df, "scaled")
+    
+    # Create and train model
+    print("\nTraining Gaussian Naive Bayes...")
+    start_time = time.time()
+    gnb_model = GaussianNB(
+        var_smoothing=1e-9  # Smoothing parameter for variance
+    )
+    
+    gnb_model.fit(X_train, y_train)
+    training_time = time.time() - start_time
+    
+    # Evaluate
+    metrics = evaluate_model(gnb_model, X_test, y_test, "Gaussian Naive Bayes", training_time)
+    
+    # Save model
+    os.makedirs("models", exist_ok=True)
+    model_path = "models/gaussian_nb_model.pkl"
+    joblib.dump(gnb_model, model_path)
+    print(f"\n✓ Gaussian Naive Bayes model saved to: {model_path}")
+    
+    return gnb_model, metrics
+
 def compare_all_models(all_metrics):
     """
     Compare performance of all models
     """
-    print(f"\n{'='*70}")
-    print("MODEL COMPARISON SUMMARY")
-    print(f"{'='*70}")
+    print(f"\n{'='*80}")
+    print("MODEL COMPARISON SUMMARY - 7 ALGORITHMS")
+    print(f"{'='*80}")
     
     # Create comparison DataFrame
     comparison_data = {}
@@ -358,56 +439,83 @@ def compare_all_models(all_metrics):
             value = all_metrics[model_name].get(metric, np.nan)
             if value is None:
                 value = np.nan
-            values.append(f"{value:.4f}" if isinstance(value, (int, float)) else "N/A")
+            # Format the value
+            if isinstance(value, (int, float)):
+                if metric in ['training_time', 'prediction_time']:
+                    values.append(f"{value:.4f}s")
+                else:
+                    values.append(f"{value:.4f}")
+            else:
+                values.append("N/A")
         comparison_data[metric.capitalize()] = values
     
     comparison_df = pd.DataFrame(comparison_data, index=model_names)
     
     # Display comparison
-    print("\nPerformance Metrics:")
-    print("-" * 100)
+    print("\nPerformance Metrics Comparison:")
+    print("-" * 120)
     print(comparison_df.to_string())
     
-    # Find best model for each metric
-    print(f"\n{'='*70}")
+    # Find best model for each metric (only for metrics where higher is better)
+    print(f"\n{'='*80}")
     print("BEST MODELS FOR EACH METRIC")
-    print(f"{'='*70}")
+    print(f"{'='*80}")
     
-    for metric in ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']:
+    higher_better_metrics = ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']
+    
+    for metric in higher_better_metrics:
         valid_models = []
         for model_name in model_names:
             value = all_metrics[model_name].get(metric)
-            if value is not None:
+            if value is not None and not np.isnan(value):
                 valid_models.append((model_name, value))
         
         if valid_models:
             best_model = max(valid_models, key=lambda x: x[1])
-            print(f"Best {metric.upper():10}: {best_model[0]:30} ({best_model[1]:.4f})")
+            print(f"Best {metric.upper():10}: {best_model[0]:35} ({best_model[1]:.4f})")
     
-    # Find fastest model
+    # Find fastest training model (lower training time is better)
     valid_times = []
     for model_name in model_names:
         value = all_metrics[model_name].get('training_time')
-        if value is not None:
+        if value is not None and not np.isnan(value):
             valid_times.append((model_name, value))
     
     if valid_times:
         fastest_model = min(valid_times, key=lambda x: x[1])
-        print(f"Fastest Training: {fastest_model[0]:30} ({fastest_model[1]:.2f}s)")
+        print(f"Fastest Training: {fastest_model[0]:35} ({fastest_model[1]:.4f}s)")
+    
+    # Find fastest prediction model (lower prediction time is better)
+    valid_pred_times = []
+    for model_name in model_names:
+        value = all_metrics[model_name].get('prediction_time')
+        if value is not None and not np.isnan(value):
+            valid_pred_times.append((model_name, value))
+    
+    if valid_pred_times:
+        fastest_pred_model = min(valid_pred_times, key=lambda x: x[1])
+        print(f"Fastest Prediction: {fastest_pred_model[0]:35} ({fastest_pred_model[1]:.4f}s)")
     
     # Overall best model (based on accuracy)
     valid_accuracies = []
     for model_name in model_names:
         value = all_metrics[model_name].get('accuracy')
-        if value is not None:
+        if value is not None and not np.isnan(value):
             valid_accuracies.append((model_name, value))
     
     if valid_accuracies:
         best_overall = max(valid_accuracies, key=lambda x: x[1])
-        print(f"\n{'*'*70}")
+        print(f"\n{'*'*80}")
         print(f"OVERALL BEST MODEL (Accuracy): {best_overall[0]}")
         print(f"Accuracy: {best_overall[1]:.4f}")
-        print(f"{'*'*70}")
+        print(f"{'*'*80}")
+        
+        # Also show which data type the best model uses
+        if best_overall[0] in ['Decision Tree', 'Random Forest']:
+            data_type = "non-scaled data"
+        else:
+            data_type = "scaled data"
+        print(f"Data type used: {data_type}")
     
     # Save comparison results
     os.makedirs("results", exist_ok=True)
@@ -416,6 +524,7 @@ def compare_all_models(all_metrics):
     # Create detailed comparison with more metrics
     detailed_comparison = []
     for model_name, metrics in all_metrics.items():
+        cm = metrics.get('confusion_matrix', np.zeros((2,2)))
         detailed_comparison.append({
             'Model': model_name,
             'Accuracy': metrics.get('accuracy', np.nan),
@@ -425,10 +534,11 @@ def compare_all_models(all_metrics):
             'ROC_AUC': metrics.get('roc_auc', np.nan),
             'Training_Time_s': metrics.get('training_time', np.nan),
             'Prediction_Time_s': metrics.get('prediction_time', np.nan),
-            'TP': metrics.get('confusion_matrix', np.zeros((2,2)))[1,1],
-            'FP': metrics.get('confusion_matrix', np.zeros((2,2)))[0,1],
-            'TN': metrics.get('confusion_matrix', np.zeros((2,2)))[0,0],
-            'FN': metrics.get('confusion_matrix', np.zeros((2,2)))[1,0]
+            'TP': cm[1,1] if cm.size >= 4 else 0,
+            'FP': cm[0,1] if cm.size >= 4 else 0,
+            'TN': cm[0,0] if cm.size >= 4 else 0,
+            'FN': cm[1,0] if cm.size >= 4 else 0,
+            'Data_Type': 'Scaled' if model_name in ['Logistic Regression', "Newton's Method", 'SVM', 'KNN', 'Gaussian NB'] else 'Non-scaled'
         })
     
     detailed_df = pd.DataFrame(detailed_comparison)
@@ -444,23 +554,28 @@ def save_training_summary(all_metrics, best_model_name):
     """
     Save training summary to a text file
     """
-    summary_content = f"""MODEL TRAINING SUMMARY
-======================
+    summary_content = f"""MODEL TRAINING SUMMARY - 7 ALGORITHMS
+=========================================
 
 Dataset Information:
 -------------------
-- Scaled data used for: Logistic Regression, Newton's Method, SVM
+- Scaled data used for: Logistic Regression, Newton's Method, SVM, KNN, Gaussian NB
 - Non-scaled data used for: Decision Tree, Random Forest
 - Test size: 20%
 - Random state: 42
 
-Models Trained:
---------------
+Models Trained (7 Total):
+------------------------
+SCALED DATA MODELS:
 1. Logistic Regression (LBFGS solver)
-2. Decision Tree
-3. Logistic Regression with Newton's Method
-4. Random Forest
-5. Support Vector Machine (SVM)
+2. Logistic Regression with Newton's Method
+3. Support Vector Machine (SVM)
+4. K-Nearest Neighbors (KNN)
+5. Gaussian Naive Bayes
+
+NON-SCALED DATA MODELS:
+6. Decision Tree
+7. Random Forest
 
 Model Performances:
 ------------------
@@ -474,13 +589,19 @@ Model Performances:
         summary_content += f"- Recall:    {metrics.get('recall', 'N/A'):.4f}\n"
         summary_content += f"- F1 Score:  {metrics.get('f1', 'N/A'):.4f}\n"
         roc_auc = metrics.get('roc_auc', 'N/A')
-        if roc_auc is not None:
+        if roc_auc is not None and not np.isnan(roc_auc):
             summary_content += f"- ROC-AUC:   {roc_auc:.4f}\n"
         else:
             summary_content += f"- ROC-AUC:   N/A\n"
         summary_content += f"- Training Time: {metrics.get('training_time', 'N/A'):.2f}s\n"
+        
+        # Add data type info
+        if model_name in ['Decision Tree', 'Random Forest']:
+            summary_content += f"- Data Type: Non-scaled\n"
+        else:
+            summary_content += f"- Data Type: Scaled\n"
 
-    summary_content += f"\n\nBest Model: {best_model_name}\n"
+    summary_content += f"\n\nBEST MODEL: {best_model_name}\n"
     
     summary_content += """
 Files Generated:
@@ -490,9 +611,11 @@ Files Generated:
 3. models/newton_method_model.pkl
 4. models/random_forest_model.pkl
 5. models/svm_model.pkl
-6. results/model_comparison_summary.csv
-7. results/detailed_model_comparison.csv
-8. results/training_summary.txt
+6. models/knn_model.pkl
+7. models/gaussian_nb_model.pkl
+8. results/model_comparison_summary.csv
+9. results/detailed_model_comparison.csv
+10. results/training_summary.txt
 """
     
     os.makedirs("results", exist_ok=True)
@@ -503,11 +626,11 @@ Files Generated:
 
 def train_all_models():
     """
-    Main function to train all 5 models
+    Main function to train all 7 models
     """
-    print("="*80)
-    print("STARTING MODEL TRAINING - 5 ALGORITHMS")
-    print("="*80)
+    print("="*90)
+    print("STARTING MODEL TRAINING - 7 MACHINE LEARNING ALGORITHMS")
+    print("="*90)
     
     # Load datasets
     scaled_df, nonscaled_df = load_datasets()
@@ -518,6 +641,17 @@ def train_all_models():
     
     all_models = {}
     all_metrics = {}
+    
+    print(f"\nTRAINING SCHEDULE:")
+    print(f"1. Logistic Regression (scaled data)")
+    print(f"2. Decision Tree (non-scaled data)")
+    print(f"3. Newton's Method (scaled data)")
+    print(f"4. Random Forest (non-scaled data)")
+    print(f"5. SVM (scaled data)")
+    print(f"6. KNN (scaled data)")
+    print(f"7. Gaussian Naive Bayes (scaled data)")
+    
+    total_start_time = time.time()
     
     # Train Logistic Regression
     lr_model, lr_metrics = train_logistic_regression(scaled_df)
@@ -540,9 +674,21 @@ def train_all_models():
     all_metrics['Random Forest'] = rf_metrics
     
     # Train SVM
-    svm_model, svm_metrics = train_svm(scaled_df)
-    all_models['SVM'] = svm_model
-    all_metrics['SVM'] = svm_metrics
+    # svm_model, svm_metrics = train_svm(scaled_df)
+    # all_models['SVM'] = svm_model
+    # all_metrics['SVM'] = svm_metrics
+    
+    # Train KNN
+    knn_model, knn_metrics = train_knn(scaled_df)
+    all_models['KNN'] = knn_model
+    all_metrics['KNN'] = knn_metrics
+    
+    # Train Gaussian Naive Bayes
+    gnb_model, gnb_metrics = train_gaussian_naive_bayes(scaled_df)
+    all_models['Gaussian NB'] = gnb_model
+    all_metrics['Gaussian NB'] = gnb_metrics
+    
+    total_training_time = time.time() - total_start_time
     
     # Compare all models
     best_model_name = compare_all_models(all_metrics)
@@ -550,18 +696,25 @@ def train_all_models():
     # Save training summary
     save_training_summary(all_metrics, best_model_name)
     
-    print(f"\n{'='*80}")
+    print(f"\n{'='*90}")
     print("TRAINING COMPLETED SUCCESSFULLY!")
-    print(f"{'='*80}")
-    print("\n✓ All 5 models trained and saved")
+    print(f"{'='*90}")
+    print(f"\n✓ All 7 models trained in {total_training_time:.2f} seconds")
     print("✓ Performance comparison generated")
     print("✓ Results saved to 'results/' directory")
-    print("\nAvailable models:")
-    print("1. Logistic Regression (models/logistic_regression_model.pkl)")
-    print("2. Decision Tree (models/decision_tree_model.pkl)")
-    print("3. Newton's Method (models/newton_method_model.pkl)")
-    print("4. Random Forest (models/random_forest_model.pkl)")
-    print("5. SVM (models/svm_model.pkl)")
+    print(f"\nTotal training time: {total_training_time:.2f} seconds")
+    
+    print("\nMODELS SAVED (7 Total):")
+    print("=" * 50)
+    print("SCALED DATA MODELS:")
+    print("1. Logistic Regression        - models/logistic_regression_model.pkl")
+    print("2. Newton's Method            - models/newton_method_model.pkl")
+    print("3. SVM                        - models/svm_model.pkl")
+    print("4. KNN                        - models/knn_model.pkl")
+    print("5. Gaussian Naive Bayes       - models/gaussian_nb_model.pkl")
+    print("\nNON-SCALED DATA MODELS:")
+    print("6. Decision Tree              - models/decision_tree_model.pkl")
+    print("7. Random Forest              - models/random_forest_model.pkl")
     
     return all_models, all_metrics
 
@@ -570,22 +723,36 @@ if __name__ == "__main__":
     all_models, all_metrics = train_all_models()
     
     if all_models:
-        print("\nTo use the models for prediction:")
+        print("\n" + "="*60)
+        print("USAGE GUIDE")
+        print("="*60)
         print("""
-        import joblib
-        
-        # Load any model
-        model = joblib.load('models/model_name.pkl')
-        
-        # For scaled data models (Logistic Regression, Newton's Method, SVM):
-        # Make sure to scale your data first using the saved scaler
-        scaler = joblib.load('models/standard_scaler.pkl')
-        X_scaled = scaler.transform(X[continuous_features])
-        
-        # For non-scaled data models (Decision Tree, Random Forest):
-        # Use data directly without scaling
-        
-        # Make predictions
-        predictions = model.predict(X)
-        probabilities = model.predict_proba(X)  # if available
+To use the models for prediction:
+
+import joblib
+
+# For scaled data models (5 models):
+scaler = joblib.load('models/standard_scaler.pkl')
+X_scaled = scaler.transform(X[continuous_features])
+
+# For non-scaled data models (2 models):
+# Use data directly without scaling
+
+# Load and use any model:
+model = joblib.load('models/model_name.pkl')
+predictions = model.predict(X)
+probabilities = model.predict_proba(X)  # if available
+
+Available models:
+===============
+SCALED DATA REQUIRED:
+- Logistic Regression
+- Newton's Method (Logistic Regression with newton-cg)
+- SVM (Support Vector Machine)
+- KNN (K-Nearest Neighbors)
+- Gaussian Naive Bayes
+
+NON-SCALED DATA REQUIRED:
+- Decision Tree
+- Random Forest
         """)

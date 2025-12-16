@@ -1,20 +1,25 @@
-MODEL TRAINING SUMMARY
-======================
+MODEL TRAINING SUMMARY - 7 ALGORITHMS
+=========================================
 
 Dataset Information:
 -------------------
-- Scaled data used for: Logistic Regression, Newton's Method, SVM
+- Scaled data used for: Logistic Regression, Newton's Method, SVM, KNN, Gaussian NB
 - Non-scaled data used for: Decision Tree, Random Forest
 - Test size: 20%
 - Random state: 42
 
-Models Trained:
---------------
+Models Trained (7 Total):
+------------------------
+SCALED DATA MODELS:
 1. Logistic Regression (LBFGS solver)
-2. Decision Tree
-3. Logistic Regression with Newton's Method
-4. Random Forest
-5. Support Vector Machine (SVM)
+2. Logistic Regression with Newton's Method
+3. Support Vector Machine (SVM)
+4. K-Nearest Neighbors (KNN)
+5. Gaussian Naive Bayes
+
+NON-SCALED DATA MODELS:
+6. Decision Tree
+7. Random Forest
 
 Model Performances:
 ------------------
@@ -25,7 +30,8 @@ Logistic Regression:
 - Recall:    0.8581
 - F1 Score:  0.8509
 - ROC-AUC:   0.9277
-- Training Time: 1.17s
+- Training Time: 1.22s
+- Data Type: Scaled
 
 Decision Tree:
 - Accuracy:  0.9466
@@ -33,7 +39,8 @@ Decision Tree:
 - Recall:    0.9342
 - F1 Score:  0.9383
 - ROC-AUC:   0.9875
-- Training Time: 0.54s
+- Training Time: 0.53s
+- Data Type: Non-scaled
 
 Newton's Method:
 - Accuracy:  0.8694
@@ -41,7 +48,8 @@ Newton's Method:
 - Recall:    0.8581
 - F1 Score:  0.8509
 - ROC-AUC:   0.9277
-- Training Time: 0.55s
+- Training Time: 0.46s
+- Data Type: Scaled
 
 Random Forest:
 - Accuracy:  0.9559
@@ -49,18 +57,29 @@ Random Forest:
 - Recall:    0.9437
 - F1 Score:  0.9490
 - ROC-AUC:   0.9925
-- Training Time: 3.41s
+- Training Time: 3.15s
+- Data Type: Non-scaled
 
-SVM:
-- Accuracy:  0.9522
-- Precision: 0.9491
-- Recall:    0.9403
-- F1 Score:  0.9447
-- ROC-AUC:   0.9882
-- Training Time: 1968.92s
+KNN:
+- Accuracy:  0.9286
+- Precision: 0.9405
+- Recall:    0.8920
+- F1 Score:  0.9156
+- ROC-AUC:   0.9712
+- Training Time: 0.03s
+- Data Type: Scaled
+
+Gaussian NB:
+- Accuracy:  0.8582
+- Precision: 0.8495
+- Recall:    0.8187
+- F1 Score:  0.8338
+- ROC-AUC:   0.9209
+- Training Time: 0.06s
+- Data Type: Scaled
 
 
-Best Model: Random Forest
+BEST MODEL: Random Forest
 
 Files Generated:
 ---------------
@@ -69,6 +88,8 @@ Files Generated:
 3. models/newton_method_model.pkl
 4. models/random_forest_model.pkl
 5. models/svm_model.pkl
-6. results/model_comparison_summary.csv
-7. results/detailed_model_comparison.csv
-8. results/training_summary.txt
+6. models/knn_model.pkl
+7. models/gaussian_nb_model.pkl
+8. results/model_comparison_summary.csv
+9. results/detailed_model_comparison.csv
+10. results/training_summary.txt

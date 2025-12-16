@@ -90,7 +90,7 @@ def preprocess_sample_data(df):
 
 def prepare_for_scaled_models(df):
     """
-    Prepare data for models that require scaling (Logistic Regression, Newton's Method, SVM)
+    Prepare data for models that require scaling (Logistic Regression, Newton's Method, SVM, KNN, Gaussian NB)
     """
     try:
         # Load the scaler
@@ -151,19 +151,21 @@ def ensure_feature_order(df, model_features):
 
 def load_all_models():
     """
-    Load all 5 trained models
+    Load all 7 trained models
     """
     print("\nLoading all trained models...")
     
     models = {}
     
-    # List of all models
+    # List of all 7 models
     model_files = {
         'Logistic Regression': 'models/logistic_regression_model.pkl',
         'Decision Tree': 'models/decision_tree_model.pkl',
         "Newton's Method": 'models/newton_method_model.pkl',
         'Random Forest': 'models/random_forest_model.pkl',
-        'SVM': 'models/svm_model.pkl'
+        'SVM': 'models/svm_model.pkl',
+        'KNN': 'models/knn_model.pkl',
+        'Gaussian NB': 'models/gaussian_nb_model.pkl'
     }
     
     for model_name, model_path in model_files.items():
@@ -202,31 +204,35 @@ def get_model_features(models):
 
 def make_predictions_with_all_models(models, model_features, features_nonscaled, features_scaled):
     """
-    Make predictions using all 5 models
+    Make predictions using all 7 models
     """
-    print("\n" + "="*60)
-    print("MAKING PREDICTIONS WITH ALL MODELS")
-    print("="*60)
+    print("\n" + "="*70)
+    print("MAKING PREDICTIONS WITH ALL 7 MODELS")
+    print("="*70)
     
     predictions = {}
+    
+    # Define which models use scaled vs non-scaled data
+    scaled_models = ['Logistic Regression', "Newton's Method", 'SVM', 'KNN', 'Gaussian NB']
+    nonscaled_models = ['Decision Tree', 'Random Forest']
     
     for model_name, model in models.items():
         if model is None:
             print(f"\n✗ Skipping {model_name} (model not loaded)")
             continue
             
-        print(f"\n{'─'*40}")
+        print(f"\n{'─'*50}")
         print(f"PREDICTING WITH: {model_name}")
-        print(f"{'─'*40}")
+        print(f"{'─'*50}")
         
         try:
             # Choose the right dataset for the model
-            if model_name in ['Logistic Regression', "Newton's Method", 'SVM']:
+            if model_name in scaled_models:
                 # Models that use scaled data
                 features = features_scaled.copy()
                 data_type = "scaled data"
             else:
-                # Models that use non-scaled data (Decision Tree, Random Forest)
+                # Models that use non-scaled data
                 features = features_nonscaled.copy()
                 data_type = "non-scaled data"
             
@@ -239,8 +245,12 @@ def make_predictions_with_all_models(models, model_features, features_nonscaled,
             
             # Get probabilities if available
             if hasattr(model, 'predict_proba'):
-                probability = model.predict_proba(features)[0]
-                confidence = max(probability) * 100
+                try:
+                    probability = model.predict_proba(features)[0]
+                    confidence = max(probability) * 100
+                except:
+                    probability = None
+                    confidence = None
             else:
                 probability = None
                 confidence = None
@@ -266,6 +276,7 @@ def make_predictions_with_all_models(models, model_features, features_nonscaled,
                     print(f"Probabilities:")
                     print(f"  - Not Satisfied: {probability[0]:.3f}")
                     print(f"  - Satisfied:     {probability[1]:.3f}")
+            print(f"Data Type:   {data_type}")
             
         except Exception as e:
             print(f"✗ Error making prediction with {model_name}: {str(e)}")
@@ -277,9 +288,9 @@ def display_final_summary(predictions):
     """
     Display a final summary of all model predictions
     """
-    print("\n" + "="*70)
-    print("FINAL PREDICTION SUMMARY")
-    print("="*70)
+    print("\n" + "="*80)
+    print("FINAL PREDICTION SUMMARY - 7 MODELS")
+    print("="*80)
     
     # Count predictions
     satisfied_count = 0
@@ -298,11 +309,13 @@ def display_final_summary(predictions):
                 not_satisfied_count += 1
             
             confidence_str = f"{pred['confidence']:.1f}%" if pred['confidence'] is not None else "N/A"
-            print(f"{model_name:25} {pred['result']:20} {confidence_str:12} {pred['data_type']:15}")
+            # Shorten data type for display
+            data_type_short = "scaled" if "scaled" in pred['data_type'] else "non-scaled"
+            print(f"{model_name:25} {pred['result']:20} {confidence_str:12} {data_type_short:15}")
     
-    print(f"\n{'='*70}")
+    print(f"\n{'='*80}")
     print("PREDICTION CONSENSUS:")
-    print(f"{'='*70}")
+    print(f"{'='*80}")
     
     if total_models == 0:
         print("No models made successful predictions.")
@@ -311,9 +324,11 @@ def display_final_summary(predictions):
     if satisfied_count > not_satisfied_count:
         majority = "SATISFIED"
         majority_count = satisfied_count
+        minority_count = not_satisfied_count
     elif not_satisfied_count > satisfied_count:
         majority = "NOT SATISFIED"
         majority_count = not_satisfied_count
+        minority_count = satisfied_count
     else:
         print("Models are evenly split (tie)")
         return
@@ -322,39 +337,48 @@ def display_final_summary(predictions):
     print(f"\n{majority_count} out of {total_models} models predict: {majority}")
     print(f"Consensus: {consensus_percentage:.1f}% of models agree")
     
-    if consensus_percentage >= 80:
-        print("✓ STRONG CONSENSUS: High agreement among models")
-    elif consensus_percentage >= 60:
+    if consensus_percentage >= 85:
+        print("✓ VERY STRONG CONSENSUS: High agreement among models")
+    elif consensus_percentage >= 70:
+        print("✓ STRONG CONSENSUS: Good agreement among models")
+    elif consensus_percentage >= 55:
         print("○ MODERATE CONSENSUS: Majority agreement")
     else:
-        print("⚠ LOW CONSENSUS: Models disagree significantly")
+        print("⚠ WEAK CONSENSUS: Models are divided")
     
-    # Show which models agree/disagree
-    print(f"\nModels predicting SATISFIED:")
-    sat_models = [name for name, pred in predictions.items() 
-                  if pred is not None and pred['prediction'] == 1]
-    if sat_models:
-        for model in sat_models:
-            print(f"  - {model}")
-    else:
-        print("  None")
+    # Show breakdown by data type
+    print(f"\nBreakdown by Data Type:")
+    print(f"{'-'*40}")
     
-    print(f"\nModels predicting NOT SATISFIED:")
-    not_sat_models = [name for name, pred in predictions.items() 
-                      if pred is not None and pred['prediction'] == 0]
-    if not_sat_models:
-        for model in not_sat_models:
-            print(f"  - {model}")
-    else:
-        print("  None")
+    # Scaled models prediction
+    scaled_models_pred = [name for name, pred in predictions.items() 
+                         if pred is not None and "scaled" in pred['data_type']]
+    scaled_satisfied = sum(1 for name in scaled_models_pred 
+                          if predictions[name]['prediction'] == 1)
+    scaled_total = len(scaled_models_pred)
+    
+    if scaled_total > 0:
+        scaled_percentage = (scaled_satisfied / scaled_total) * 100
+        print(f"Scaled models ({scaled_total}): {scaled_satisfied} predict SATISFIED ({scaled_percentage:.1f}%)")
+    
+    # Non-scaled models prediction
+    nonscaled_models_pred = [name for name, pred in predictions.items() 
+                            if pred is not None and "non-scaled" in pred['data_type']]
+    nonscaled_satisfied = sum(1 for name in nonscaled_models_pred 
+                             if predictions[name]['prediction'] == 1)
+    nonscaled_total = len(nonscaled_models_pred)
+    
+    if nonscaled_total > 0:
+        nonscaled_percentage = (nonscaled_satisfied / nonscaled_total) * 100
+        print(f"Non-scaled models ({nonscaled_total}): {nonscaled_satisfied} predict SATISFIED ({nonscaled_percentage:.1f}%)")
 
 def get_confidence_ranking(predictions):
     """
     Rank models by prediction confidence
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'='*70}")
     print("MODEL CONFIDENCE RANKING")
-    print(f"{'='*60}")
+    print(f"{'='*70}")
     
     # Filter models with confidence scores
     models_with_confidence = [(name, pred) for name, pred in predictions.items() 
@@ -367,25 +391,27 @@ def get_confidence_ranking(predictions):
     # Sort by confidence (descending)
     sorted_models = sorted(models_with_confidence, key=lambda x: x[1]['confidence'], reverse=True)
     
-    print(f"\n{'Rank':6} {'Model':25} {'Confidence':12} {'Prediction':15}")
-    print(f"{'-'*6} {'-'*25} {'-'*12} {'-'*15}")
+    print(f"\n{'Rank':6} {'Model':25} {'Confidence':12} {'Prediction':15} {'Data Type':15}")
+    print(f"{'-'*6} {'-'*25} {'-'*12} {'-'*15} {'-'*15}")
     
     for rank, (model_name, pred) in enumerate(sorted_models, 1):
-        print(f"{rank:6} {model_name:25} {pred['confidence']:.1f}%{'':8} {pred['result']:15}")
+        data_type_short = "scaled" if "scaled" in pred['data_type'] else "non-scaled"
+        print(f"{rank:6} {model_name:25} {pred['confidence']:.1f}%{'':8} {pred['result']:15} {data_type_short:15}")
     
     # Show most confident model
     most_confident = sorted_models[0]
     print(f"\n✓ Most confident model: {most_confident[0]}")
     print(f"  Prediction: {most_confident[1]['result']} ({most_confident[1]['confidence']:.1f}% confidence)")
+    print(f"  Data Type: {'Scaled' if 'scaled' in most_confident[1]['data_type'] else 'Non-scaled'}")
 
 def predict_with_all_models():
     """
-    Main function to make predictions using all 5 models
+    Main function to make predictions using all 7 models
     """
-    print("\n" + "="*70)
+    print("\n" + "="*80)
     print("AIRLINE PASSENGER SATISFACTION PREDICTION")
-    print("Testing with 5 Machine Learning Models")
-    print("="*70)
+    print("Testing with 7 Machine Learning Models")
+    print("="*80)
     
     try:
         # Step 1: Create sample data
@@ -404,7 +430,7 @@ def predict_with_all_models():
         # Step 3: Prepare both scaled and non-scaled versions
         print("\nPreparing data versions:")
         print("  - Non-scaled data (for Decision Tree, Random Forest)")
-        print("  - Scaled data (for Logistic Regression, Newton's Method, SVM)")
+        print("  - Scaled data (for Logistic Regression, Newton's Method, SVM, KNN, Gaussian NB)")
         
         # Create non-scaled features
         features_nonscaled = processed_df.drop('Satisfaction', axis=1) if 'Satisfaction' in processed_df.columns else processed_df.copy()
@@ -437,9 +463,9 @@ def predict_with_all_models():
         # Step 8: Show confidence ranking
         get_confidence_ranking(predictions)
         
-        print("\n" + "="*70)
+        print("\n" + "="*80)
         print("PREDICTION COMPLETE")
-        print("="*70)
+        print("="*80)
         
         return predictions
         
@@ -447,13 +473,11 @@ def predict_with_all_models():
         print(f"\nError: {str(e)}")
         print("\nPlease ensure:")
         print("1. You have run 'python src/preprocess.py' to generate the datasets")
-        print("2. You have run 'python src/train.py' to train all 5 models")
+        print("2. You have run 'python src/train.py' to train all 7 models")
         print("3. The following model files exist:")
-        print("   - models/logistic_regression_model.pkl")
-        print("   - models/decision_tree_model.pkl")
-        print("   - models/newton_method_model.pkl")
-        print("   - models/random_forest_model.pkl")
-        print("   - models/svm_model.pkl")
+        for model_name in ['Logistic Regression', 'Decision Tree', "Newton's Method", 
+                          'Random Forest', 'SVM', 'KNN', 'Gaussian NB']:
+            print(f"   - models/{model_name.lower().replace(' ', '_').replace("'", '')}_model.pkl")
         print("   - models/standard_scaler.pkl")
         print("\nRun these commands first if needed:")
         print("  python src/preprocess.py")
@@ -465,55 +489,39 @@ def predict_with_all_models():
         traceback.print_exc()
         return None
 
-def interactive_mode():
-    """
-    Optional: Allow user to enter custom data
-    """
-    print("\n" + "="*60)
-    print("INTERACTIVE PREDICTION MODE")
-    print("="*60)
-    
-    print("\nWould you like to enter custom passenger data? (y/n)")
-    choice = input().lower()
-    
-    if choice == 'y':
-        print("\nEnter passenger details:")
-        print("Note: For now, using the default sample data.")
-        print("To add custom data input, modify the create_sample_dataframe() function.")
-    
-    # Use default sample data
-    return predict_with_all_models()
-
 if __name__ == "__main__":
     # Run prediction with all models
     predictions = predict_with_all_models()
     
     if predictions:
-        print("\n" + "="*60)
+        print("\n" + "="*70)
         print("USAGE GUIDE")
-        print("="*60)
+        print("="*70)
         print("""
-To use individual model predictions in your code:
+Available Models (7 Total):
+==========================
+SCALED DATA REQUIRED (5 models):
+- Logistic Regression
+- Newton's Method
+- SVM (Support Vector Machine)
+- KNN (K-Nearest Neighbors)
+- Gaussian Naive Bayes
+
+NON-SCALED DATA REQUIRED (2 models):
+- Decision Tree
+- Random Forest
+
+To use individual models:
 
 import joblib
 
-# Load specific model
+# Load model
 model = joblib.load('models/model_name.pkl')
 
-# Get prediction for a single sample
-prediction = model.predict(features)[0]
-probability = model.predict_proba(features)[0]  # if available
+# For scaled models, scale your data first:
+scaler = joblib.load('models/standard_scaler.pkl')
+X_scaled = scaler.transform(X[continuous_features])
 
-# 0 = Not Satisfied, 1 = Satisfied
-if prediction == 1:
-    print("Passenger is SATISFIED")
-else:
-    print("Passenger is NOT SATISFIED")
-    
-Available models:
-1. Logistic Regression - Uses scaled data
-2. Decision Tree - Uses non-scaled data
-3. Newton's Method - Uses scaled data
-4. Random Forest - Uses non-scaled data
-5. SVM - Uses scaled data
+# Make prediction
+prediction = model.predict(X)[0]
         """)
