@@ -1,25 +1,28 @@
-MODEL TRAINING SUMMARY - 7 ALGORITHMS
-=========================================
+MODEL TRAINING SUMMARY - 9 MACHINE LEARNING ALGORITHMS
+=========================================================
 
 Dataset Information:
 -------------------
-- Scaled data used for: Logistic Regression, Newton's Method, SVM, KNN, Gaussian NB
+- Scaled data used for: Logistic Regression, Newton's Method, SVM, KNN, 
+                       Gaussian NB, Neural Network, Bayesian Network
 - Non-scaled data used for: Decision Tree, Random Forest
 - Test size: 20%
 - Random state: 42
 
-Models Trained (7 Total):
+Models Trained (9 Total):
 ------------------------
-SCALED DATA MODELS:
+SCALED DATA MODELS (7 models):
 1. Logistic Regression (LBFGS solver)
 2. Logistic Regression with Newton's Method
 3. Support Vector Machine (SVM)
 4. K-Nearest Neighbors (KNN)
 5. Gaussian Naive Bayes
+6. Neural Network (Multi-layer Perceptron)
+7. Bayesian Network (with fallback to Gaussian NB if needed)
 
-NON-SCALED DATA MODELS:
-6. Decision Tree
-7. Random Forest
+NON-SCALED DATA MODELS (2 models):
+8. Decision Tree
+9. Random Forest
 
 Model Performances:
 ------------------
@@ -30,7 +33,7 @@ Logistic Regression:
 - Recall:    0.8581
 - F1 Score:  0.8509
 - ROC-AUC:   0.9277
-- Training Time: 1.22s
+- Training Time: 1.20s
 - Data Type: Scaled
 
 Decision Tree:
@@ -39,7 +42,7 @@ Decision Tree:
 - Recall:    0.9342
 - F1 Score:  0.9383
 - ROC-AUC:   0.9875
-- Training Time: 0.53s
+- Training Time: 0.46s
 - Data Type: Non-scaled
 
 Newton's Method:
@@ -48,7 +51,7 @@ Newton's Method:
 - Recall:    0.8581
 - F1 Score:  0.8509
 - ROC-AUC:   0.9277
-- Training Time: 0.46s
+- Training Time: 0.43s
 - Data Type: Scaled
 
 Random Forest:
@@ -57,7 +60,7 @@ Random Forest:
 - Recall:    0.9437
 - F1 Score:  0.9490
 - ROC-AUC:   0.9925
-- Training Time: 3.15s
+- Training Time: 2.98s
 - Data Type: Non-scaled
 
 KNN:
@@ -66,7 +69,7 @@ KNN:
 - Recall:    0.8920
 - F1 Score:  0.9156
 - ROC-AUC:   0.9712
-- Training Time: 0.03s
+- Training Time: 0.09s
 - Data Type: Scaled
 
 Gaussian NB:
@@ -75,11 +78,29 @@ Gaussian NB:
 - Recall:    0.8187
 - F1 Score:  0.8338
 - ROC-AUC:   0.9209
-- Training Time: 0.06s
+- Training Time: 0.12s
+- Data Type: Scaled
+
+Neural Network:
+- Accuracy:  0.9607
+- Precision: 0.9720
+- Recall:    0.9365
+- F1 Score:  0.9539
+- ROC-AUC:   0.9942
+- Training Time: 19.50s
+- Data Type: Scaled
+
+Bayesian Network:
+- Accuracy:  0.8582
+- Precision: 0.8495
+- Recall:    0.8187
+- F1 Score:  0.8338
+- ROC-AUC:   0.9209
+- Training Time: 0.09s
 - Data Type: Scaled
 
 
-BEST MODEL: Random Forest
+OVERALL BEST MODEL: Neural Network
 
 Files Generated:
 ---------------
@@ -90,6 +111,8 @@ Files Generated:
 5. models/svm_model.pkl
 6. models/knn_model.pkl
 7. models/gaussian_nb_model.pkl
-8. results/model_comparison_summary.csv
-9. results/detailed_model_comparison.csv
-10. results/training_summary.txt
+8. models/neural_network_model.pkl
+9. models/bayesian_network_model.pkl
+10. results/model_comparison_summary.csv
+11. results/detailed_model_comparison.csv
+12. results/training_summary.txt

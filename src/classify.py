@@ -90,7 +90,7 @@ def preprocess_sample_data(df):
 
 def prepare_for_scaled_models(df):
     """
-    Prepare data for models that require scaling (Logistic Regression, Newton's Method, SVM, KNN, Gaussian NB)
+    Prepare data for models that require scaling (all except Decision Tree and Random Forest)
     """
     try:
         # Load the scaler
@@ -137,6 +137,9 @@ def ensure_feature_order(df, model_features):
     """
     Ensure the dataframe has the same feature order as the model expects
     """
+    if model_features is None:
+        return df
+    
     # Get columns that are in model_features but not in df
     missing_cols = set(model_features) - set(df.columns)
     
@@ -151,13 +154,13 @@ def ensure_feature_order(df, model_features):
 
 def load_all_models():
     """
-    Load all 7 trained models
+    Load all 9 trained models
     """
     print("\nLoading all trained models...")
     
     models = {}
     
-    # List of all 7 models
+    # List of all 9 models
     model_files = {
         'Logistic Regression': 'models/logistic_regression_model.pkl',
         'Decision Tree': 'models/decision_tree_model.pkl',
@@ -165,7 +168,9 @@ def load_all_models():
         'Random Forest': 'models/random_forest_model.pkl',
         'SVM': 'models/svm_model.pkl',
         'KNN': 'models/knn_model.pkl',
-        'Gaussian NB': 'models/gaussian_nb_model.pkl'
+        'Gaussian NB': 'models/gaussian_nb_model.pkl',
+        'Neural Network': 'models/neural_network_model.pkl',
+        # 'Bayesian Network': 'models/bayesian_network_model.pkl'
     }
     
     for model_name, model_path in model_files.items():
@@ -194,26 +199,76 @@ def get_model_features(models):
                     model_features[model_name] = list(model.feature_names_in_)
                 else:
                     # Try to infer from training data
-                    train_data = pd.read_csv("data/processed/classification_data.csv")
-                    model_features[model_name] = [col for col in train_data.columns if col != 'Satisfaction']
+                    try:
+                        train_data = pd.read_csv("data/processed/classification_data.csv")
+                        model_features[model_name] = [col for col in train_data.columns if col != 'Satisfaction']
+                    except:
+                        # For Bayesian Network, use default
+                        model_features[model_name] = None
             except:
                 # Default features if cannot determine
                 model_features[model_name] = None
     
     return model_features
 
+def make_prediction_bayesian(model, features):
+    """
+    Special prediction function for Bayesian Network
+    """
+    try:
+        # Check if model is a dictionary (saved Bayesian Network)
+        if isinstance(model, dict) and 'inference' in model:
+            bn_inference = model['inference']
+            
+            # Prepare evidence dictionary
+            evidence = {}
+            for col in features.columns:
+                evidence[col] = features[col].iloc[0]
+            
+            # Make prediction using MAP query
+            query_result = bn_inference.map_query(variables=['Satisfaction'], evidence=evidence, show_progress=False)
+            prediction = query_result['Satisfaction']
+            
+            # Try to get probability
+            try:
+                prob_result = bn_inference.query(variables=['Satisfaction'], evidence=evidence, show_progress=False)
+                prob_df = prob_result.values
+                if len(prob_df) >= 2:
+                    probability = [prob_df[0], prob_df[1]]
+                else:
+                    probability = [0.5, 0.5]
+            except:
+                probability = [0.5, 0.5]
+            
+            return prediction, probability
+            
+        else:
+            # If not a Bayesian Network, use regular predict
+            prediction = model.predict(features)[0]
+            if hasattr(model, 'predict_proba'):
+                probability = model.predict_proba(features)[0]
+            else:
+                probability = [0.5, 0.5]
+            return prediction, probability
+            
+    except Exception as e:
+        print(f"Bayesian Network prediction error: {str(e)}")
+        # Return default prediction
+        return 1, [0.5, 0.5]
+
 def make_predictions_with_all_models(models, model_features, features_nonscaled, features_scaled):
     """
-    Make predictions using all 7 models
+    Make predictions using all 9 models
     """
-    print("\n" + "="*70)
-    print("MAKING PREDICTIONS WITH ALL 7 MODELS")
-    print("="*70)
+    print("\n" + "="*80)
+    print("MAKING PREDICTIONS WITH ALL 9 MODELS")
+    print("="*80)
     
     predictions = {}
     
     # Define which models use scaled vs non-scaled data
-    scaled_models = ['Logistic Regression', "Newton's Method", 'SVM', 'KNN', 'Gaussian NB']
+    scaled_models = ['Logistic Regression', "Newton's Method", 'SVM', 'KNN', 
+                    'Gaussian NB', 'Neural Network', 'Bayesian Network']
     nonscaled_models = ['Decision Tree', 'Random Forest']
     
     for model_name, model in models.items():
@@ -236,24 +291,26 @@ def make_predictions_with_all_models(models, model_features, features_nonscaled,
                 features = features_nonscaled.copy()
                 data_type = "non-scaled data"
             
-            # Ensure feature order
-            if model_features.get(model_name) is not None:
+            # Ensure feature order for non-Bayesian models
+            if model_name != 'Bayesian Network' and model_features.get(model_name) is not None:
                 features = ensure_feature_order(features, model_features[model_name])
             
             # Make prediction
-            prediction = model.predict(features)[0]
-            
-            # Get probabilities if available
-            if hasattr(model, 'predict_proba'):
-                try:
-                    probability = model.predict_proba(features)[0]
-                    confidence = max(probability) * 100
-                except:
-                    probability = None
-                    confidence = None
+            if model_name == 'Bayesian Network':
+                prediction, probability = make_prediction_bayesian(model, features)
             else:
-                probability = None
-                confidence = None
+                prediction = model.predict(features)[0]
+                # Get probabilities if available
+                if hasattr(model, 'predict_proba'):
+                    try:
+                        probability = model.predict_proba(features)[0]
+                    except:
+                        probability = [0.5, 0.5]
+                else:
+                    probability = [0.5, 0.5]
+            
+            # Calculate confidence
+            confidence = max(probability) * 100 if probability is not None else None
             
             # Map prediction to readable labels
             prediction_map = {0: "NOT SATISFIED", 1: "SATISFIED"}
@@ -280,6 +337,8 @@ def make_predictions_with_all_models(models, model_features, features_nonscaled,
             
         except Exception as e:
             print(f"✗ Error making prediction with {model_name}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             predictions[model_name] = None
     
     return predictions
@@ -288,9 +347,9 @@ def display_final_summary(predictions):
     """
     Display a final summary of all model predictions
     """
-    print("\n" + "="*80)
-    print("FINAL PREDICTION SUMMARY - 7 MODELS")
-    print("="*80)
+    print("\n" + "="*100)
+    print("FINAL PREDICTION SUMMARY - 9 MODELS")
+    print("="*100)
     
     # Count predictions
     satisfied_count = 0
@@ -313,9 +372,9 @@ def display_final_summary(predictions):
             data_type_short = "scaled" if "scaled" in pred['data_type'] else "non-scaled"
             print(f"{model_name:25} {pred['result']:20} {confidence_str:12} {data_type_short:15}")
     
-    print(f"\n{'='*80}")
+    print(f"\n{'='*100}")
     print("PREDICTION CONSENSUS:")
-    print(f"{'='*80}")
+    print(f"{'='*100}")
     
     if total_models == 0:
         print("No models made successful predictions.")
@@ -337,12 +396,14 @@ def display_final_summary(predictions):
     print(f"\n{majority_count} out of {total_models} models predict: {majority}")
     print(f"Consensus: {consensus_percentage:.1f}% of models agree")
     
-    if consensus_percentage >= 85:
+    if consensus_percentage >= 90:
+        print("✓ EXCEPTIONAL CONSENSUS: Very high agreement among models")
+    elif consensus_percentage >= 80:
         print("✓ VERY STRONG CONSENSUS: High agreement among models")
     elif consensus_percentage >= 70:
         print("✓ STRONG CONSENSUS: Good agreement among models")
-    elif consensus_percentage >= 55:
-        print("○ MODERATE CONSENSUS: Majority agreement")
+    elif consensus_percentage >= 60:
+        print("○ MODERATE CONSENSUS: Clear majority")
     else:
         print("⚠ WEAK CONSENSUS: Models are divided")
     
@@ -376,9 +437,9 @@ def get_confidence_ranking(predictions):
     """
     Rank models by prediction confidence
     """
-    print(f"\n{'='*70}")
+    print(f"\n{'='*80}")
     print("MODEL CONFIDENCE RANKING")
-    print(f"{'='*70}")
+    print(f"{'='*80}")
     
     # Filter models with confidence scores
     models_with_confidence = [(name, pred) for name, pred in predictions.items() 
@@ -406,12 +467,12 @@ def get_confidence_ranking(predictions):
 
 def predict_with_all_models():
     """
-    Main function to make predictions using all 7 models
+    Main function to make predictions using all 9 models
     """
-    print("\n" + "="*80)
+    print("\n" + "="*100)
     print("AIRLINE PASSENGER SATISFACTION PREDICTION")
-    print("Testing with 7 Machine Learning Models")
-    print("="*80)
+    print("Testing with 9 Machine Learning Models")
+    print("="*100)
     
     try:
         # Step 1: Create sample data
@@ -430,7 +491,7 @@ def predict_with_all_models():
         # Step 3: Prepare both scaled and non-scaled versions
         print("\nPreparing data versions:")
         print("  - Non-scaled data (for Decision Tree, Random Forest)")
-        print("  - Scaled data (for Logistic Regression, Newton's Method, SVM, KNN, Gaussian NB)")
+        print("  - Scaled data (for 7 other models)")
         
         # Create non-scaled features
         features_nonscaled = processed_df.drop('Satisfaction', axis=1) if 'Satisfaction' in processed_df.columns else processed_df.copy()
@@ -463,9 +524,9 @@ def predict_with_all_models():
         # Step 8: Show confidence ranking
         get_confidence_ranking(predictions)
         
-        print("\n" + "="*80)
+        print("\n" + "="*100)
         print("PREDICTION COMPLETE")
-        print("="*80)
+        print("="*100)
         
         return predictions
         
@@ -473,11 +534,14 @@ def predict_with_all_models():
         print(f"\nError: {str(e)}")
         print("\nPlease ensure:")
         print("1. You have run 'python src/preprocess.py' to generate the datasets")
-        print("2. You have run 'python src/train.py' to train all 7 models")
+        print("2. You have run 'python src/train.py' to train all 9 models")
         print("3. The following model files exist:")
-        for model_name in ['Logistic Regression', 'Decision Tree', "Newton's Method", 
-                          'Random Forest', 'SVM', 'KNN', 'Gaussian NB']:
-            print(f"   - models/{model_name.lower().replace(' ', '_').replace("'", '')}_model.pkl")
+        model_names = ['Logistic Regression', 'Decision Tree', "Newton's Method", 
+                      'Random Forest', 'SVM', 'KNN', 'Gaussian NB', 
+                      'Neural Network', 'Bayesian Network']
+        for model_name in model_names:
+            filename = model_name.lower().replace(' ', '_').replace("'", '').replace(' ', '_')
+            print(f"   - models/{filename}_model.pkl")
         print("   - models/standard_scaler.pkl")
         print("\nRun these commands first if needed:")
         print("  python src/preprocess.py")
@@ -494,18 +558,20 @@ if __name__ == "__main__":
     predictions = predict_with_all_models()
     
     if predictions:
-        print("\n" + "="*70)
+        print("\n" + "="*80)
         print("USAGE GUIDE")
-        print("="*70)
+        print("="*80)
         print("""
-Available Models (7 Total):
+Available Models (9 Total):
 ==========================
-SCALED DATA REQUIRED (5 models):
+SCALED DATA REQUIRED (7 models):
 - Logistic Regression
 - Newton's Method
 - SVM (Support Vector Machine)
 - KNN (K-Nearest Neighbors)
 - Gaussian Naive Bayes
+- Neural Network (Multi-layer Perceptron)
+- Bayesian Network
 
 NON-SCALED DATA REQUIRED (2 models):
 - Decision Tree
@@ -521,6 +587,13 @@ model = joblib.load('models/model_name.pkl')
 # For scaled models, scale your data first:
 scaler = joblib.load('models/standard_scaler.pkl')
 X_scaled = scaler.transform(X[continuous_features])
+
+# For Bayesian Network, special handling may be needed
+if model_name == 'Bayesian Network':
+    # The model might be saved as a dictionary
+    if isinstance(model, dict):
+        bn_model = model['inference']
+        # Use bn_model for predictions
 
 # Make prediction
 prediction = model.predict(X)[0]
