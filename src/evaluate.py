@@ -495,7 +495,7 @@ def create_visualizations(all_metrics, comparison_df):
     print(f"  Created {len([f for f in os.listdir('visuals') if f.endswith('.png')])} visualization files")
 
 if __name__ == "__main__":
-    # main()
+    main()
 
     all_models = load_models()
     if all_models:

@@ -74,7 +74,7 @@ def preprocess_sample_data(df):
     customer_type_mapping = {'first time': 0, 'returning': 1}
     df_processed['Customer Type'] = df_processed['Customer Type'].map(customer_type_mapping)
     
-    travel_type_mapping = {'Business': 0, 'Personal': 1}
+    travel_type_mapping = {'Business': 1, 'Personal': 0}
     df_processed['Type of Travel'] = df_processed['Type of Travel'].map(travel_type_mapping)
     
     # One-hot encode Class column
